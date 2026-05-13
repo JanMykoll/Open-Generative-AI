@@ -1,4 +1,5 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById, getV2VModelById, getLipSyncModelById } from './models.js';
+import { generateFalImage } from './providers/fal.js';
 
 const BASE_URL = 'https://api.muapi.ai';
 const PROXY_WF_BASE = '/api/workflow';
@@ -49,6 +50,9 @@ async function submitAndPoll(endpoint, payload, key, onRequestId, maxAttempts = 
 
 export async function generateImage(apiKey, params) {
     const modelInfo = getModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalImage(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const payload = { prompt: params.prompt };
     if (params.aspect_ratio) payload.aspect_ratio = params.aspect_ratio;

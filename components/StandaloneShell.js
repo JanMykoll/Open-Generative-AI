@@ -53,7 +53,9 @@ export default function StandaloneShell() {
   
   const [apiKey, setApiKey] = useState(null);
   const [activeTab, setActiveTab] = useState(getInitialTab());
-  
+  const [falKey, setFalKey] = useState('');
+  const [falKeyDraft, setFalKeyDraft] = useState('');
+
   const [balance, setBalance] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -122,7 +124,20 @@ export default function StandaloneShell() {
       // Sync cookie immediately on mount to establish identity for background requests
       document.cookie = `muapi_key=${stored}; path=/; max-age=31536000; SameSite=Lax`;
     }
+    const storedFal = localStorage.getItem('fal_key') || '';
+    setFalKey(storedFal);
+    setFalKeyDraft(storedFal);
   }, [fetchBalance]);
+
+  const handleFalKeySave = useCallback(() => {
+    const trimmed = (falKeyDraft || '').trim();
+    if (trimmed) {
+      localStorage.setItem('fal_key', trimmed);
+    } else {
+      localStorage.removeItem('fal_key');
+    }
+    setFalKey(trimmed);
+  }, [falKeyDraft]);
 
   const handleKeySave = useCallback((key) => {
     localStorage.setItem(STORAGE_KEY, key);
@@ -213,7 +228,7 @@ export default function StandaloneShell() {
     </div>
   );
 
-  if (!apiKey) {
+  if (!apiKey && !falKey) {
     return <ApiKeyModal onSave={handleKeySave} />;
   }
 
@@ -325,11 +340,37 @@ export default function StandaloneShell() {
             <div className="space-y-4 mb-8">
               <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
                 <label className="block text-xs font-bold text-white/30 mb-2">
-                   Active API Key
+                   Muapi API Key
                 </label>
                 <div className="text-[13px] font-mono text-white/80">
-                  {apiKey.slice(0, 8)}••••••••••••••••
+                  {apiKey ? `${apiKey.slice(0, 8)}••••••••••••••••` : <span className="text-white/30">— not set —</span>}
                 </div>
+              </div>
+
+              <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
+                <label className="block text-xs font-bold text-white/30 mb-2">
+                   Fal.ai API Key {falKey && <span className="text-[#d9ff00]/70 font-normal ml-1">· saved</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={falKeyDraft}
+                    onChange={(e) => setFalKeyDraft(e.target.value)}
+                    placeholder="Paste fal.ai key…"
+                    className="flex-1 bg-black/30 border border-white/[0.05] rounded px-3 py-2 text-[13px] font-mono text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#d9ff00]/30"
+                    suppressHydrationWarning
+                  />
+                  <button
+                    onClick={handleFalKeySave}
+                    className="px-3 rounded bg-[#d9ff00]/10 text-[#d9ff00] hover:bg-[#d9ff00]/20 text-xs font-semibold transition-all"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="text-[11px] text-white/30 mt-2">
+                  Required for fal-prefixed models. Get one at{' '}
+                  <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noreferrer" className="text-white/50 hover:text-[#d9ff00]">fal.ai/dashboard/keys</a>.
+                </p>
               </div>
             </div>
 

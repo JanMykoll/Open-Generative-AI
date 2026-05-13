@@ -1,6 +1,38 @@
 // Auto-generated from models_dump.json
 export const t2iModels = [
   {
+    "id": "fal-flux-schnell",
+    "name": "Flux Schnell (fal.ai)",
+    "endpoint": "fal-ai/flux/schnell",
+    "provider": "fal",
+    "family": "flux",
+    "inputs": {
+      "prompt": {
+        "examples": [
+          "A cyberpunk samurai standing in neon-lit Tokyo rain, ultra-detailed, cinematic lighting"
+        ],
+        "description": "Text prompt describing the image.",
+        "type": "string",
+        "title": "Prompt",
+        "name": "prompt"
+      },
+      "aspect_ratio": {
+        "enum": [
+          "1:1",
+          "4:3",
+          "3:4",
+          "16:9",
+          "9:16"
+        ],
+        "title": "Aspect Ratio",
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Aspect ratio of the output image.",
+        "default": "1:1"
+      }
+    }
+  },
+  {
     "id": "nano-banana",
     "name": "Nano Banana",
     "endpoint": "nano-banana",

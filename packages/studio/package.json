@@ -14,7 +14,9 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@fal-ai/client": "^1.10.1",
     "@xyflow/react": "^12.10.2",
+    "ai-agent": "file:../Open-Poe-AI/packages/agents",
     "axios": "^1.7.0",
     "lucide-react": "^1.8.0",
     "react-hot-toast": "^2.4.1",
@@ -24,8 +26,7 @@
     "react-toastify": "^11.1.0",
     "reactflow": "^11.11.4",
     "remark-gfm": "^4.0.1",
-    "workflow-builder": "file:../Vibe-Workflow/packages/workflow-builder",
-    "ai-agent": "file:../Open-Poe-AI/packages/agents"
+    "workflow-builder": "file:../Vibe-Workflow/packages/workflow-builder"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
