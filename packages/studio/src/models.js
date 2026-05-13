@@ -2,7 +2,7 @@
 export const t2iModels = [
   {
     "id": "fal-flux-schnell",
-    "name": "Flux Schnell (fal.ai)",
+    "name": "Flux Schnell",
     "endpoint": "fal-ai/flux/schnell",
     "provider": "fal",
     "family": "flux",
@@ -8440,3 +8440,123 @@ export const imageLipSyncModels = lipsyncModels.filter(m => m.category === 'imag
 export const videoLipSyncModels = lipsyncModels.filter(m => m.category === 'video');
 
 export const getV2VModelById = (id) => v2vModels.find(m => m.id === id);
+
+// ─── Phase B: pricing overlay + dual-provider entries (2026-05-13) ────────────
+// Source-of-truth pricing audit lives in KAN-540 / GOALSPEC.md.
+// Schema per entry: { provider, price_usd, alt_provider?, family? }.
+const PRICING = {
+  // ── t2i ──────────────────────────────────────────────────────────────
+  'fal-flux-schnell':        { provider: 'fal',   price_usd: 0.003, alt_provider: 'muapi', family: 'flux' },
+  'flux-schnell':            { provider: 'muapi', price_usd: 0.003, alt_provider: 'fal',   family: 'flux' },
+  'flux-dev':                { provider: 'muapi', price_usd: 0.015, alt_provider: 'fal',   family: 'flux' },
+  'google-imagen4':          { provider: 'muapi', price_usd: 0.05,  alt_provider: 'fal' },
+  'google-imagen4-fast':     { provider: 'muapi', price_usd: 0.02,  alt_provider: 'fal' },
+  'google-imagen4-ultra':    { provider: 'muapi', price_usd: 0.06,  alt_provider: 'fal' },
+  'gpt-image-2':             { provider: 'muapi', price_usd: 0.211, alt_provider: 'openai-batch' },
+  'nano-banana':             { provider: 'muapi', price_usd: 0.039, alt_provider: 'fal' },
+  // ── t2v ──────────────────────────────────────────────────────────────
+  'seedance-lite-t2v':       { provider: 'muapi', price_usd: 0.10,  alt_provider: 'fal' },
+  'seedance-pro-t2v':        { provider: 'muapi', price_usd: 0.18,  alt_provider: 'fal' },
+  'seedance-pro-t2v-fast':   { provider: 'muapi', price_usd: 0.06 },
+  'veo3-text-to-video':      { provider: 'muapi', price_usd: 2.50,  alt_provider: 'fal' },
+  'veo3-fast-text-to-video': { provider: 'muapi', price_usd: 0.60,  alt_provider: 'fal' },
+  'veo3.1-fast-text-to-video':{provider: 'muapi', price_usd: 0.60,  alt_provider: 'fal' },
+  'veo3.1-lite-text-to-video':{provider: 'muapi', price_usd: 0.30,  alt_provider: 'fal' },
+  'kling-v2.1-master-t2v':   { provider: 'muapi', price_usd: 1.20,  alt_provider: 'fal' },
+  'kling-v2.5-turbo-pro-t2v':{ provider: 'muapi', price_usd: 0.45,  alt_provider: 'fal' },
+  'kling-v2.6-pro-t2v':      { provider: 'muapi', price_usd: 0.90,  alt_provider: 'fal' },
+  'minimax-hailuo-02-standard-t2v': { provider: 'muapi', price_usd: 0.30, alt_provider: 'fal' },
+  'minimax-hailuo-02-pro-t2v':      { provider: 'muapi', price_usd: 0.60, alt_provider: 'fal' },
+  'minimax-hailuo-2.3-pro-t2v':     { provider: 'muapi', price_usd: 0.63 },
+  'wan2.2-text-to-video':    { provider: 'muapi', price_usd: 0.30,  alt_provider: 'fal' },
+  'wan2.5-text-to-video':    { provider: 'muapi', price_usd: 0.65,  alt_provider: 'fal' },
+  'wan2.6-text-to-video':    { provider: 'muapi', price_usd: 0.65 },
+  'hunyuan-text-to-video':   { provider: 'muapi', price_usd: 0.15,  alt_provider: 'fal' },
+  'runway-text-to-video':    { provider: 'muapi', price_usd: 0.09 },
+  'openai-sora-2-text-to-video': { provider: 'muapi', price_usd: 0.10, alt_provider: 'fal' },
+};
+
+for (const arr of [t2iModels, t2vModels, i2iModels, i2vModels, v2vModels, lipsyncModels]) {
+  for (const m of arr) {
+    const p = PRICING[m.id];
+    if (p) Object.assign(m, { ...p, family: p.family || m.family });
+    if (!m.provider) m.provider = 'muapi';
+  }
+}
+
+// Synthetic fal-hosted duplicates for muapi-listed shared models.
+// Same display name → picker groups them as one family; price_usd drives the
+// "default cheapest" checkmark.  Endpoint values follow fal's documented slugs.
+const FAL_DUPS_T2I = [
+  {
+    id: 'fal-flux-dev',
+    name: 'Flux Dev',
+    endpoint: 'fal-ai/flux/dev',
+    provider: 'fal',
+    family: 'flux',
+    price_usd: 0.025,
+    alt_provider: 'muapi',
+    inputs: { prompt: { type: 'string', name: 'prompt', title: 'Prompt' }, aspect_ratio: { enum: ['1:1','4:3','3:4','16:9','9:16'], type: 'string', name: 'aspect_ratio', title: 'Aspect Ratio', default: '1:1' } },
+  },
+  {
+    id: 'fal-flux-pro',
+    name: 'Flux Pro',
+    endpoint: 'fal-ai/flux-pro',
+    provider: 'fal',
+    family: 'flux',
+    price_usd: 0.05,
+    inputs: { prompt: { type: 'string', name: 'prompt', title: 'Prompt' }, aspect_ratio: { enum: ['1:1','4:3','3:4','16:9','9:16'], type: 'string', name: 'aspect_ratio', title: 'Aspect Ratio', default: '1:1' } },
+  },
+  {
+    id: 'fal-nano-banana',
+    name: 'Nano Banana',
+    endpoint: 'fal-ai/nano-banana',
+    provider: 'fal',
+    family: 'nano-banana',
+    price_usd: 0.039,
+    alt_provider: 'muapi',
+    inputs: { prompt: { type: 'string', name: 'prompt', title: 'Prompt' }, aspect_ratio: { enum: ['1:1','4:3','3:4','16:9','9:16'], type: 'string', name: 'aspect_ratio', title: 'Aspect Ratio', default: '1:1' } },
+  },
+  {
+    id: 'fal-imagen4',
+    name: 'Google Imagen4',
+    endpoint: 'fal-ai/imagen4',
+    provider: 'fal',
+    family: 'imagen',
+    price_usd: 0.05,
+    alt_provider: 'muapi',
+    inputs: { prompt: { type: 'string', name: 'prompt', title: 'Prompt' }, aspect_ratio: { enum: ['1:1','4:3','3:4','16:9','9:16'], type: 'string', name: 'aspect_ratio', title: 'Aspect Ratio', default: '1:1' } },
+  },
+  {
+    id: 'fal-imagen4-fast',
+    name: 'Google Imagen4 Fast',
+    endpoint: 'fal-ai/imagen4/preview/fast',
+    provider: 'fal',
+    family: 'imagen',
+    price_usd: 0.02,
+    alt_provider: 'muapi',
+    inputs: { prompt: { type: 'string', name: 'prompt', title: 'Prompt' }, aspect_ratio: { enum: ['1:1','4:3','3:4','16:9','9:16'], type: 'string', name: 'aspect_ratio', title: 'Aspect Ratio', default: '1:1' } },
+  },
+];
+t2iModels.push(...FAL_DUPS_T2I);
+
+const FAL_DUPS_T2V = [
+  { id: 'fal-veo3-fast', name: 'Veo 3 Fast', endpoint: 'fal-ai/veo3/fast', provider: 'fal', family: 'veo', price_usd: 0.50, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-veo3.1-fast', name: 'Veo 3.1 Fast', endpoint: 'fal-ai/veo3.1/fast', provider: 'fal', family: 'veo', price_usd: 0.50, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-kling-2.5-turbo-pro', name: 'Kling v2.5 Turbo Pro', endpoint: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video', provider: 'fal', family: 'kling', price_usd: 0.35, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-kling-2.6-pro', name: 'Kling v2.6 Pro', endpoint: 'fal-ai/kling-video/v2.6/pro/text-to-video', provider: 'fal', family: 'kling', price_usd: 0.35, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-hailuo-02-std', name: 'Hailuo 02 Standard', endpoint: 'fal-ai/minimax/hailuo-02/standard/text-to-video', provider: 'fal', family: 'hailuo', price_usd: 0.225, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-hailuo-02-pro', name: 'Hailuo 02 Pro', endpoint: 'fal-ai/minimax/hailuo-02/pro/text-to-video', provider: 'fal', family: 'hailuo', price_usd: 0.40, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-wan-2.5', name: 'Wan 2.5', endpoint: 'fal-ai/wan/v2.5/text-to-video', provider: 'fal', family: 'wan', price_usd: 0.50, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+  { id: 'fal-sora-2', name: 'Sora 2', endpoint: 'fal-ai/sora-2/text-to-video', provider: 'fal', family: 'sora', price_usd: 0.50, alt_provider: 'muapi', inputs: { prompt: { type: 'string', name: 'prompt' }, duration: { default: 5 } } },
+];
+t2vModels.push(...FAL_DUPS_T2V);
+
+// Cheapest-default lookup: returns the lowest-priced variant for a given name
+// among models in `arr`.  Used by the picker to mark the default with a checkmark.
+export function getCheapestVariantId(arr, name) {
+  const variants = arr.filter(m => m.name === name);
+  if (variants.length < 2) return null;
+  const sorted = [...variants].sort((a, b) => (a.price_usd ?? Infinity) - (b.price_usd ?? Infinity));
+  return sorted[0].id;
+}

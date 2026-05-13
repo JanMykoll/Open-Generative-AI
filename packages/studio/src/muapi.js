@@ -1,5 +1,12 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById, getV2VModelById, getLipSyncModelById } from './models.js';
-import { generateFalImage } from './providers/fal.js';
+import {
+    generateFalImage,
+    generateFalI2I,
+    generateFalVideo,
+    generateFalI2V,
+    generateFalV2V,
+    generateFalLipSync,
+} from './providers/fal.js';
 
 const BASE_URL = 'https://api.muapi.ai';
 const PROXY_WF_BASE = '/api/workflow';
@@ -72,6 +79,9 @@ export async function generateImage(apiKey, params) {
 
 export async function generateI2I(apiKey, params) {
     const modelInfo = getI2IModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalI2I(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const payload = {};
     if (params.prompt) payload.prompt = params.prompt;
@@ -89,6 +99,9 @@ export async function generateI2I(apiKey, params) {
 
 export async function generateVideo(apiKey, params) {
     const modelInfo = getVideoModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalVideo(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const payload = {};
     if (params.prompt) payload.prompt = params.prompt;
@@ -103,6 +116,9 @@ export async function generateVideo(apiKey, params) {
 
 export async function generateI2V(apiKey, params) {
     const modelInfo = getI2VModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalI2V(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const payload = {};
     if (params.prompt) payload.prompt = params.prompt;
@@ -137,6 +153,9 @@ export async function generateMarketingStudioAd(apiKey, params) {
 
 export async function processV2V(apiKey, params) {
     const modelInfo = getV2VModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalV2V(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const videoField = modelInfo?.videoField || 'video_url';
     const payload = { [videoField]: params.video_url };
@@ -151,6 +170,9 @@ export async function processV2V(apiKey, params) {
 
 export async function processLipSync(apiKey, params) {
     const modelInfo = getLipSyncModelById(params.model);
+    if (modelInfo?.provider === 'fal') {
+        return generateFalLipSync(modelInfo, params);
+    }
     const endpoint = modelInfo?.endpoint || params.model;
     const payload = {};
     if (params.audio_url) payload.audio_url = params.audio_url;

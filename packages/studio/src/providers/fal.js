@@ -36,25 +36,16 @@ function pickOutputUrl(result) {
         || null;
 }
 
-export async function generateFalImage(model, params) {
-    ensureConfigured();
-    const endpoint = model?.endpoint || params.model;
-
-    const input = { prompt: params.prompt };
-    if (params.aspect_ratio) input.image_size = mapAspectRatioToImageSize(params.aspect_ratio);
-    if (params.seed && params.seed !== -1) input.seed = params.seed;
-    if (params.num_images) input.num_images = params.num_images;
-
+async function falSubscribe(endpoint, input, params) {
     const result = await fal.subscribe(endpoint, {
         input,
         logs: false,
         onQueueUpdate: (update) => {
-            if (update.status === 'IN_QUEUE' && params.onRequestId && update.request_id) {
+            if (update.status === 'IN_QUEUE' && params?.onRequestId && update.request_id) {
                 params.onRequestId(update.request_id);
             }
         },
     });
-
     const url = pickOutputUrl(result);
     return {
         ...result.data,
@@ -63,4 +54,81 @@ export async function generateFalImage(model, params) {
         status: 'completed',
         provider: 'fal',
     };
+}
+
+export async function generateFalImage(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = { prompt: params.prompt };
+    if (params.aspect_ratio) input.image_size = mapAspectRatioToImageSize(params.aspect_ratio);
+    if (params.seed && params.seed !== -1) input.seed = params.seed;
+    if (params.num_images) input.num_images = params.num_images;
+    return falSubscribe(endpoint, input, params);
+}
+
+export async function generateFalI2I(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = {};
+    if (params.prompt) input.prompt = params.prompt;
+    const imagesList = params.images_list?.length > 0
+        ? params.images_list
+        : (params.image_url ? [params.image_url] : null);
+    if (imagesList) {
+        // Fal i2i endpoints commonly accept either `image_url` (single) or `image_urls` (list)
+        if (imagesList.length > 1) input.image_urls = imagesList;
+        else input.image_url = imagesList[0];
+    }
+    if (params.aspect_ratio) input.image_size = mapAspectRatioToImageSize(params.aspect_ratio);
+    if (params.strength !== undefined) input.strength = params.strength;
+    if (params.seed && params.seed !== -1) input.seed = params.seed;
+    return falSubscribe(endpoint, input, params);
+}
+
+export async function generateFalVideo(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = {};
+    if (params.prompt) input.prompt = params.prompt;
+    if (params.aspect_ratio) input.aspect_ratio = params.aspect_ratio;
+    if (params.duration) input.duration = params.duration;
+    if (params.resolution) input.resolution = params.resolution;
+    if (params.seed && params.seed !== -1) input.seed = params.seed;
+    return falSubscribe(endpoint, input, params);
+}
+
+export async function generateFalI2V(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = {};
+    if (params.prompt) input.prompt = params.prompt;
+    if (params.image_url) input.image_url = params.image_url;
+    if (params.last_image) input.tail_image_url = params.last_image;
+    if (params.aspect_ratio) input.aspect_ratio = params.aspect_ratio;
+    if (params.duration) input.duration = params.duration;
+    if (params.resolution) input.resolution = params.resolution;
+    if (params.seed && params.seed !== -1) input.seed = params.seed;
+    return falSubscribe(endpoint, input, params);
+}
+
+export async function generateFalV2V(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = {};
+    if (params.prompt) input.prompt = params.prompt;
+    if (params.video_url) input.video_url = params.video_url;
+    if (params.image_url) input.image_url = params.image_url;
+    if (params.seed && params.seed !== -1) input.seed = params.seed;
+    return falSubscribe(endpoint, input, params);
+}
+
+export async function generateFalLipSync(model, params) {
+    ensureConfigured();
+    const endpoint = model?.endpoint || params.model;
+    const input = {};
+    if (params.audio_url) input.audio_url = params.audio_url;
+    if (params.video_url) input.video_url = params.video_url;
+    if (params.image_url) input.image_url = params.image_url;
+    if (params.prompt) input.prompt = params.prompt;
+    return falSubscribe(endpoint, input, params);
 }

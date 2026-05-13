@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ImageStudio, VideoStudio, LipSyncStudio, CinemaStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, getUserBalance } from 'studio';
+import { ImageStudio, VideoStudio, LipSyncStudio, CinemaStudio, MarketingStudio, WorkflowStudio, AgentStudio, AppsStudio, BulkGenStudio, getUserBalance } from 'studio';
 import axios from 'axios';
 import ApiKeyModal from './ApiKeyModal';
 
@@ -14,6 +14,7 @@ const TABS = [
   { id: 'marketing', label: 'Marketing Studio' },
   { id: 'workflows', label: 'Workflows' },
   { id: 'agents', label: 'Agents' },
+  { id: 'bulk', label: 'Bulk Gen' },
   { id: 'apps', label: 'Explore Apps' },
 ];
 
@@ -55,6 +56,8 @@ export default function StandaloneShell() {
   const [activeTab, setActiveTab] = useState(getInitialTab());
   const [falKey, setFalKey] = useState('');
   const [falKeyDraft, setFalKeyDraft] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [openaiKeyDraft, setOpenaiKeyDraft] = useState('');
 
   const [balance, setBalance] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -127,6 +130,9 @@ export default function StandaloneShell() {
     const storedFal = localStorage.getItem('fal_key') || '';
     setFalKey(storedFal);
     setFalKeyDraft(storedFal);
+    const storedOpenAI = localStorage.getItem('openai_key') || '';
+    setOpenaiKey(storedOpenAI);
+    setOpenaiKeyDraft(storedOpenAI);
   }, [fetchBalance]);
 
   const handleFalKeySave = useCallback(() => {
@@ -138,6 +144,16 @@ export default function StandaloneShell() {
     }
     setFalKey(trimmed);
   }, [falKeyDraft]);
+
+  const handleOpenAIKeySave = useCallback(() => {
+    const trimmed = (openaiKeyDraft || '').trim();
+    if (trimmed) {
+      localStorage.setItem('openai_key', trimmed);
+    } else {
+      localStorage.removeItem('openai_key');
+    }
+    setOpenaiKey(trimmed);
+  }, [openaiKeyDraft]);
 
   const handleKeySave = useCallback((key) => {
     localStorage.setItem(STORAGE_KEY, key);
@@ -228,7 +244,7 @@ export default function StandaloneShell() {
     </div>
   );
 
-  if (!apiKey && !falKey) {
+  if (!apiKey && !falKey && !openaiKey) {
     return <ApiKeyModal onSave={handleKeySave} />;
   }
 
@@ -326,6 +342,7 @@ export default function StandaloneShell() {
         {activeTab === 'workflows' && <WorkflowStudio apiKey={apiKey} isHeaderVisible={isHeaderVisible} onToggleHeader={setIsHeaderVisible} />}
         {activeTab === 'agents' && <AgentStudio apiKey={apiKey} isHeaderVisible={isHeaderVisible} onToggleHeader={setIsHeaderVisible} />}
         {activeTab === 'apps' && <AppsStudio apiKey={apiKey} />}
+        {activeTab === 'bulk' && <BulkGenStudio />}
       </div>
 
       {/* Settings Modal */}
@@ -370,6 +387,33 @@ export default function StandaloneShell() {
                 <p className="text-[11px] text-white/30 mt-2">
                   Required for fal-prefixed models. Get one at{' '}
                   <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noreferrer" className="text-white/50 hover:text-[#d9ff00]">fal.ai/dashboard/keys</a>.
+                </p>
+              </div>
+
+              <div className="bg-white/5 border border-white/[0.03] rounded-md p-4">
+                <label className="block text-xs font-bold text-white/30 mb-2">
+                   OpenAI API Key {openaiKey && <span className="text-[#d9ff00]/70 font-normal ml-1">· saved</span>}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={openaiKeyDraft}
+                    onChange={(e) => setOpenaiKeyDraft(e.target.value)}
+                    placeholder="sk-…"
+                    data-testid="openai-key-input"
+                    className="flex-1 bg-black/30 border border-white/[0.05] rounded px-3 py-2 text-[13px] font-mono text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#d9ff00]/30"
+                    suppressHydrationWarning
+                  />
+                  <button
+                    onClick={handleOpenAIKeySave}
+                    data-testid="openai-key-save"
+                    className="px-3 rounded bg-[#d9ff00]/10 text-[#d9ff00] hover:bg-[#d9ff00]/20 text-xs font-semibold transition-all"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="text-[11px] text-white/30 mt-2">
+                  Required for the Bulk Gen tab (gpt-image-2 via OpenAI Batch API).
                 </p>
               </div>
             </div>

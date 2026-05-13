@@ -12,6 +12,7 @@ import {
   getResolutionsForI2IModel,
   getQualityFieldForI2IModel,
   getMaxImagesForI2IModel,
+  getCheapestVariantId,
 } from "../models.js";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -613,6 +614,14 @@ function ModelDropdown({ models, selectedModel, onSelect, onClose }) {
       m.id.toLowerCase().includes(search.toLowerCase()),
   );
 
+  // Per-name cheapest-default → checkmark next to the cheaper variant when a
+  // model is dual-hosted (e.g. Flux Schnell exists on both fal and muapi).
+  const cheapestByName = {};
+  for (const m of models) {
+    if (cheapestByName[m.name] !== undefined) continue;
+    cheapestByName[m.name] = getCheapestVariantId(models, m.name);
+  }
+
   return (
     <div className="flex flex-col gap-2 h-full max-h-[60vh]">
       <div className="border-b border-white/5 shrink-0">
@@ -668,9 +677,28 @@ function ModelDropdown({ models, selectedModel, onSelect, onClose }) {
                 {m.name.charAt(0)}
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-bold text-white tracking-tight">
+                <span className="text-xs font-bold text-white tracking-tight flex items-center gap-1.5">
                   {m.name}
+                  {m.provider && (
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm tracking-wide ${
+                      m.provider === 'fal' ? 'bg-purple-500/15 text-purple-300' :
+                      m.provider === 'openai' ? 'bg-emerald-500/15 text-emerald-300' :
+                      'bg-blue-500/15 text-blue-300'
+                    }`} data-testid={`provider-badge-${m.id}`}>
+                      {m.provider}
+                    </span>
+                  )}
+                  {cheapestByName[m.name] === m.id && (
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm bg-[#d9ff00]/15 text-[#d9ff00] tracking-wide" data-testid={`default-badge-${m.id}`}>
+                      cheapest
+                    </span>
+                  )}
                 </span>
+                {m.price_usd !== undefined && (
+                  <span className="text-[10px] text-white/40 font-mono" data-testid={`price-${m.id}`}>
+                    ${m.price_usd.toFixed(3)}
+                  </span>
+                )}
               </div>
             </div>
             {selectedModel === m.id && (
@@ -975,6 +1003,13 @@ export default function ImageStudio({
     setSelectedAr(ars[0] || "1:1");
     setSelectedQuality(resolutions[0] || null);
     if (imageMode) setMaxImages(getMaxImagesForI2IModel(m.id));
+    // Persist per-name provider override across sessions/reloads.
+    try {
+      const raw = localStorage.getItem('model_provider_overrides');
+      const overrides = raw ? JSON.parse(raw) : {};
+      overrides[m.name] = m.provider || 'muapi';
+      localStorage.setItem('model_provider_overrides', JSON.stringify(overrides));
+    } catch {}
   };
 
   // ── History helpers ──────────────────────────────────────────────────────
