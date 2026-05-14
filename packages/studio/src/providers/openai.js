@@ -7,6 +7,10 @@ export function getOpenAIKey() {
   return localStorage.getItem('openai_key');
 }
 
+export function hasOpenAIKey() {
+  return !!getOpenAIKey();
+}
+
 function authHeaders() {
   const key = getOpenAIKey();
   if (!key) throw new Error('OpenAI API key missing. Add it under Settings → OpenAI API Key.');

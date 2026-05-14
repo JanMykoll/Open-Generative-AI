@@ -6,6 +6,7 @@ import {
   pollBatch,
   cancelBatch,
   downloadBatchResults,
+  hasOpenAIKey,
 } from "../providers/openai.js";
 
 const STORAGE_KEY = "openai_batches";
@@ -49,9 +50,10 @@ export default function BulkGenStudio() {
     setBatches(loadBatches());
   }, []);
 
-  // Auto-poll non-terminal batches every 2 min.
+  // Auto-poll non-terminal batches every 2 min — only if a key is set.
   useEffect(() => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    if (!hasOpenAIKey()) return;
     const anyActive = batches.some((b) => !isTerminal(b.status));
     if (!anyActive) return;
     pollTimerRef.current = setInterval(() => {
@@ -62,6 +64,7 @@ export default function BulkGenStudio() {
   }, [batches.length]);
 
   const refreshBatch = useCallback(async (batchId) => {
+    if (!hasOpenAIKey()) return; // silent no-op; UI surfaces the missing-key banner.
     try {
       const fresh = await pollBatch(batchId);
       setBatches((prev) => {
@@ -175,6 +178,12 @@ export default function BulkGenStudio() {
             (50% cheaper than synchronous calls; SLA 24h, usually 1–6h).
           </p>
         </header>
+
+        {!hasOpenAIKey() && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-md p-3 text-yellow-200 text-sm" data-testid="no-key-banner">
+            No OpenAI key set. Open Settings → OpenAI API Key to enable submission and polling.
+          </div>
+        )}
 
         <section className="bg-white/[0.03] border border-white/5 rounded-lg p-5 flex flex-col gap-4">
           <div>
