@@ -120,19 +120,44 @@ export default function StandaloneShell() {
 
   useEffect(() => {
     setHasMounted(true);
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setApiKey(stored);
-      fetchBalance(stored);
-      // Sync cookie immediately on mount to establish identity for background requests
-      document.cookie = `muapi_key=${stored}; path=/; max-age=31536000; SameSite=Lax`;
-    }
-    const storedFal = localStorage.getItem('fal_key') || '';
-    setFalKey(storedFal);
-    setFalKeyDraft(storedFal);
-    const storedOpenAI = localStorage.getItem('openai_key') || '';
-    setOpenaiKey(storedOpenAI);
-    setOpenaiKeyDraft(storedOpenAI);
+    let storedMu  = localStorage.getItem(STORAGE_KEY);
+    let storedFal = localStorage.getItem('fal_key') || '';
+    let storedOAI = localStorage.getItem('openai_key') || '';
+
+    const applyKeys = () => {
+      if (storedMu) {
+        setApiKey(storedMu);
+        fetchBalance(storedMu);
+        document.cookie = `muapi_key=${storedMu}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+      setFalKey(storedFal);
+      setFalKeyDraft(storedFal);
+      setOpenaiKey(storedOAI);
+      setOpenaiKeyDraft(storedOAI);
+    };
+
+    // Seed missing keys from server-side /api/keys (Vercel env vars).
+    // Locally returns {} so existing paste flow still works.
+    fetch('/api/keys', { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((env) => {
+        if (env && typeof env === 'object') {
+          if (!storedMu && env.muapi) {
+            localStorage.setItem(STORAGE_KEY, env.muapi);
+            storedMu = env.muapi;
+          }
+          if (!storedFal && env.fal) {
+            localStorage.setItem('fal_key', env.fal);
+            storedFal = env.fal;
+          }
+          if (!storedOAI && env.openai) {
+            localStorage.setItem('openai_key', env.openai);
+            storedOAI = env.openai;
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(applyKeys);
   }, [fetchBalance]);
 
   const handleFalKeySave = useCallback(() => {
