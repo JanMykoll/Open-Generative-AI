@@ -1,0 +1,16 @@
+# Vite SPA leftovers — this project is deployed as Next.js only on Vercel.
+# The Vite path (vite.config.mjs, src/, index.html, dist/) is for the Electron build.
+index.html
+dist/
+src/
+electron/
+release/
+.playwright-mcp/
+smoke-*.png
+bash.exe.stackdump
+
+# Submodule build artifacts (Vercel will reinstall + transpile via Next.js).
+packages/*/node_modules/
+packages/*/dist/
+packages/*/packages/*/node_modules/
+packages/*/packages/*/dist/
