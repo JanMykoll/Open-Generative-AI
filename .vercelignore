@@ -1,16 +1,15 @@
 # Vite SPA leftovers — this project is deployed as Next.js only on Vercel.
 # The Vite path (vite.config.mjs, src/, index.html, dist/) is for the Electron build.
-index.html
-dist/
-src/
-electron/
-release/
-.playwright-mcp/
-smoke-*.png
-bash.exe.stackdump
+# Patterns are anchored to repo root so nested workspace package src/ / dist/ are kept.
+/index.html
+/dist/
+/src/
+/electron/
+/release/
+/.playwright-mcp/
+/smoke-*.png
+/bash.exe.stackdump
 
-# Submodule build artifacts (Vercel will reinstall + transpile via Next.js).
+# Drop only node_modules from workspace packages — keep their dist/ (used as package main).
 packages/*/node_modules/
-packages/*/dist/
 packages/*/packages/*/node_modules/
-packages/*/packages/*/dist/
