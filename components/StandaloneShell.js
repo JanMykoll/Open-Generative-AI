@@ -60,6 +60,7 @@ export default function StandaloneShell() {
   const [openaiKeyDraft, setOpenaiKeyDraft] = useState('');
 
   const [balance, setBalance] = useState(null);
+  const [keysLoading, setKeysLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
@@ -120,44 +121,54 @@ export default function StandaloneShell() {
 
   useEffect(() => {
     setHasMounted(true);
-    let storedMu  = localStorage.getItem(STORAGE_KEY);
-    let storedFal = localStorage.getItem('fal_key') || '';
-    let storedOAI = localStorage.getItem('openai_key') || '';
 
-    const applyKeys = () => {
-      if (storedMu) {
-        setApiKey(storedMu);
-        fetchBalance(storedMu);
-        document.cookie = `muapi_key=${storedMu}; path=/; max-age=31536000; SameSite=Lax`;
-      }
-      setFalKey(storedFal);
-      setFalKeyDraft(storedFal);
-      setOpenaiKey(storedOAI);
-      setOpenaiKeyDraft(storedOAI);
-    };
+    // 1. Apply any localStorage keys SYNCHRONOUSLY — no async gap, so a
+    //    returning user never sees the ApiKeyModal flash on remount.
+    const lsMu  = localStorage.getItem(STORAGE_KEY);
+    const lsFal = localStorage.getItem('fal_key') || '';
+    const lsOAI = localStorage.getItem('openai_key') || '';
+    if (lsMu) {
+      setApiKey(lsMu);
+      fetchBalance(lsMu);
+      document.cookie = `muapi_key=${lsMu}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+    setFalKey(lsFal);
+    setFalKeyDraft(lsFal);
+    setOpenaiKey(lsOAI);
+    setOpenaiKeyDraft(lsOAI);
 
-    // Seed missing keys from server-side /api/keys (Vercel env vars).
-    // Locally returns {} so existing paste flow still works.
+    // 2. If anything is still missing, try to seed it from /api/keys
+    //    (Vercel env vars). Locally returns {} so the paste flow stays.
+    //    keysLoading gates the modal so a first-time authed user (no
+    //    localStorage yet) sees the spinner, not a modal flash.
+    if (lsMu && lsFal && lsOAI) {
+      setKeysLoading(false);
+      return;
+    }
     fetch('/api/keys', { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.json() : {}))
       .then((env) => {
         if (env && typeof env === 'object') {
-          if (!storedMu && env.muapi) {
+          if (!lsMu && env.muapi) {
             localStorage.setItem(STORAGE_KEY, env.muapi);
-            storedMu = env.muapi;
+            setApiKey(env.muapi);
+            fetchBalance(env.muapi);
+            document.cookie = `muapi_key=${env.muapi}; path=/; max-age=31536000; SameSite=Lax`;
           }
-          if (!storedFal && env.fal) {
+          if (!lsFal && env.fal) {
             localStorage.setItem('fal_key', env.fal);
-            storedFal = env.fal;
+            setFalKey(env.fal);
+            setFalKeyDraft(env.fal);
           }
-          if (!storedOAI && env.openai) {
+          if (!lsOAI && env.openai) {
             localStorage.setItem('openai_key', env.openai);
-            storedOAI = env.openai;
+            setOpenaiKey(env.openai);
+            setOpenaiKeyDraft(env.openai);
           }
         }
       })
       .catch(() => {})
-      .finally(applyKeys);
+      .finally(() => setKeysLoading(false));
   }, [fetchBalance]);
 
   const handleFalKeySave = useCallback(() => {
@@ -263,13 +274,19 @@ export default function StandaloneShell() {
     setDroppedFiles(null);
   }, []);
 
-  if (!hasMounted) return (
+  const hasAnyKey = !!apiKey || !!falKey || !!openaiKey;
+
+  // Spinner while mounting, or while /api/keys is still in flight AND we
+  // have nothing to show yet. If any key is already present we render the
+  // studio immediately and let the fetch backfill the rest silently —
+  // this is what kills the modal/spinner flash on tab switches.
+  if (!hasMounted || (keysLoading && !hasAnyKey)) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <div className="animate-spin text-[#d9ff00] text-3xl">◌</div>
     </div>
   );
 
-  if (!apiKey && !falKey && !openaiKey) {
+  if (!hasAnyKey) {
     return <ApiKeyModal onSave={handleKeySave} />;
   }
 
