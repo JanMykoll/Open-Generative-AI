@@ -89,11 +89,15 @@ async function falSeedanceI2V(endpoint, body, falKey, onSubmit) {
   const id = sd.request_id;
   if (onSubmit) onSubmit(sd);
   if (!id) throw new Error(`fal submit returned no request_id: ${submitText.slice(0, 200)}`);
+  // Use the canonical URLs fal returns — building them by hand breaks on
+  // multi-segment model ids (the queue app id != the full submit path).
+  const statusUrl = sd.status_url || `https://queue.fal.run/${endpoint}/requests/${id}/status`;
+  const responseUrl = sd.response_url || `https://queue.fal.run/${endpoint}/requests/${id}`;
 
   await new Promise(r => setTimeout(r, 3000));
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    const sr = await fetch(`https://queue.fal.run/${endpoint}/requests/${id}/status`, { headers });
+    const sr = await fetch(statusUrl, { headers });
     if (!sr.ok) {
       if (sr.status >= 500) continue;
       throw new Error(`fal status ${sr.status} (req=${id}): ${(await sr.text()).slice(0, 200)}`);
@@ -101,9 +105,11 @@ async function falSeedanceI2V(endpoint, body, falKey, onSubmit) {
     const sdata = await sr.json();
     const st = (sdata.status || '').toUpperCase();
     if (st === 'COMPLETED') {
-      const rr = await fetch(`https://queue.fal.run/${endpoint}/requests/${id}`, { headers });
+      const rr = await fetch(responseUrl, { headers });
       const rdata = await rr.json();
-      return rdata.video?.url || rdata.url || rdata.output?.url;
+      const out = rdata.video?.url || rdata.url || rdata.output?.url || rdata.outputs?.[0]?.url;
+      if (!out) throw new Error(`fal completed but no video url: ${JSON.stringify(rdata).slice(0, 300)}`);
+      return out;
     }
     if (['FAILED', 'ERROR', 'CANCELLED'].includes(st)) {
       throw new Error(`fal gen ${st} (req=${id}): ${JSON.stringify(sdata).slice(0, 300)}`);
@@ -118,7 +124,7 @@ function parseArgs(argv) {
     clip: 5, model: 'kling-v3.0-pro-motion-control', concat: false,
     noRecreate: false, only: 0, prompt: '', promptsFile: '', workdir: '',
     // Seedance 2.0 (fal) one-shot mode
-    seedance: false, duration: 12, resolution: '720p', tier: 'fast',
+    seedance: false, ref2v: false, duration: 12, resolution: '720p', tier: 'fast',
     keyframeAt: 0, // seconds into source; default first frame
     // ComfyUI provider knobs (KAN-582). 9:16, 5s @ 24fps defaults.
     cfWidth: 544, cfHeight: 960, cfFps: 24, cfLength: 121, cfSeed: 0,
@@ -136,6 +142,7 @@ function parseArgs(argv) {
     else if (x === '--concat') a.concat = true;
     else if (x === '--workdir') a.workdir = argv[++i];
     else if (x === '--seedance') a.seedance = true;
+    else if (x === '--ref2v') { a.seedance = true; a.ref2v = true; }
     else if (x === '--duration') a.duration = +argv[++i];
     else if (x === '--resolution') a.resolution = argv[++i];
     else if (x === '--tier') a.tier = argv[++i];
@@ -160,9 +167,15 @@ function seedanceCost(duration, tier) {
   return (SEEDANCE_PRICE_PER_SEC[tier] || SEEDANCE_PRICE_PER_SEC.fast) * duration;
 }
 function seedanceEndpoint(tier) {
+  // NOTE: no `fal-ai/` prefix — Seedance is a `bytedance/`-namespaced model on fal.
   return tier === 'fast'
-    ? 'fal-ai/bytedance/seedance/2.0/fast/image-to-video'
-    : 'fal-ai/bytedance/seedance/2.0/image-to-video';
+    ? 'bytedance/seedance-2.0/fast/image-to-video'
+    : 'bytedance/seedance-2.0/image-to-video';
+}
+function seedanceRefEndpoint(tier) {
+  return tier === 'fast'
+    ? 'bytedance/seedance-2.0/fast/reference-to-video'
+    : 'bytedance/seedance-2.0/reference-to-video';
 }
 
 function sh(cmd, args) {
@@ -258,11 +271,15 @@ async function muapiV2V(model, videoUrl, imageUrl, prompt, key, onSubmit) {
 }
 
 // ── ComfyUI provider (KAN-582): local I2V on Jan's 4090, $0/clip ────────────
-// Default workflow: LTX-Video 2B v0.9.5 (single 6.3GB checkpoint, native nodes).
+// Default workflow: WAN 2.2 TI2V-5B (separate UNET+CLIP+VAE loaders). Chosen over
+// LTX-Video because LTX's CLIP-less checkpoint segfaults torch's storage layer on
+// this Windows box (CheckpointLoaderSimple → access violation); WAN's split files
+// load cleanly. ltx-video-i2v.json is kept for when the torch/safetensors issue is
+// resolved — point COMFYUI_WORKFLOW at it to switch.
 // Input: first-frame .jpg (already extracted for the Kling path) + prompt.
 // Output: SaveVideo node writes an mp4 to ComfyUI's output/ dir; we /view-fetch it.
 const COMFYUI_URL_DEFAULT = 'http://localhost:8188';
-const COMFYUI_WORKFLOW_DEFAULT = 'scripts/comfyui-workflows/ltx-video-i2v.json';
+const COMFYUI_WORKFLOW_DEFAULT = 'scripts/comfyui-workflows/wan22-ti2v-5b-i2v.json';
 
 async function comfyuiUploadImage(comfyUrl, localImagePath) {
   const buf = readFileSync(localImagePath);
@@ -383,27 +400,49 @@ async function main() {
       throw new Error(`--duration must be one of ${validDur.join(',')}`);
     if (!a.prompt) throw new Error('--prompt is required for --seedance (use /seedance-prompt to build one)');
     const cost = seedanceCost(a.duration, a.tier).toFixed(2);
-    const endpoint = seedanceEndpoint(a.tier);
-    console.log(`[3/5] Seedance 2.0 (${a.tier}, ${a.resolution}) ${a.duration}s ≈ $${cost}`);
+    const endpoint = a.ref2v ? seedanceRefEndpoint(a.tier) : seedanceEndpoint(a.tier);
+    console.log(`[3/5] Seedance 2.0 ${a.ref2v ? 'reference-to-video' : 'I2V'} (${a.tier}, ${a.resolution}) ${a.duration}s ≈ $${cost}`);
     console.log(`      endpoint: ${endpoint}`);
-    // Extract keyframe at --keyframe-at seconds
-    const frame = path.join(workdir, 'keyframe.jpg');
-    sh('ffmpeg', ['-y', '-ss', String(a.keyframeAt), '-i', src, '-frames:v', '1', '-q:v', '2', frame]);
-    const frameKey = `videos/recreate/${run}/keyframe.jpg`;
-    const url = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/r2/buckets/congruent-storage/objects/${frameKey}`;
-    sh('curl', ['-s', '-X', 'PUT', url,
-      '-H', `Authorization: Bearer ${env.CLOUDFLARE_R2_API_TOKEN}`,
-      '-H', 'Content-Type: image/jpeg',
-      '--data-binary', `@${frame}`]);
-    const imageUrl = `${R2_PUBLIC}/${frameKey}`;
-    console.log(`      keyframe → ${imageUrl}`);
-    const body = {
-      prompt: a.prompt,
-      image_url: imageUrl,
-      duration: a.duration,
-      resolution: a.resolution,
-      generate_audio: false,
-    };
+
+    let body;
+    if (a.ref2v) {
+      // Upload the whole source clip → pass as video_urls[0]; prompt references @Video1.
+      const vidKey = `videos/recreate/${run}/source-ref.mp4`;
+      const vurl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/r2/buckets/congruent-storage/objects/${vidKey}`;
+      sh('curl', ['-s', '-X', 'PUT', vurl,
+        '-H', `Authorization: Bearer ${env.CLOUDFLARE_R2_API_TOKEN}`,
+        '-H', 'Content-Type: video/mp4',
+        '--data-binary', `@${src}`]);
+      const refVideoUrl = `${R2_PUBLIC}/${vidKey}`;
+      console.log(`      reference video → ${refVideoUrl}`);
+      body = {
+        prompt: a.prompt,
+        video_urls: [refVideoUrl],
+        duration: a.duration,
+        resolution: a.resolution,
+        aspect_ratio: '9:16',
+        generate_audio: false,
+      };
+    } else {
+      // Extract keyframe at --keyframe-at seconds
+      const frame = path.join(workdir, 'keyframe.jpg');
+      sh('ffmpeg', ['-y', '-ss', String(a.keyframeAt), '-i', src, '-frames:v', '1', '-q:v', '2', frame]);
+      const frameKey = `videos/recreate/${run}/keyframe.jpg`;
+      const url = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/r2/buckets/congruent-storage/objects/${frameKey}`;
+      sh('curl', ['-s', '-X', 'PUT', url,
+        '-H', `Authorization: Bearer ${env.CLOUDFLARE_R2_API_TOKEN}`,
+        '-H', 'Content-Type: image/jpeg',
+        '--data-binary', `@${frame}`]);
+      const imageUrl = `${R2_PUBLIC}/${frameKey}`;
+      console.log(`      keyframe → ${imageUrl}`);
+      body = {
+        prompt: a.prompt,
+        image_url: imageUrl,
+        duration: a.duration,
+        resolution: a.resolution,
+        generate_audio: false,
+      };
+    }
     writeFileSync(path.join(workdir, 'fal-body.json'), JSON.stringify(body, null, 2));
     console.log(`[4/5] submitting to fal (you've ALREADY approved spending $${cost})`);
     const resultUrl = await falSeedanceI2V(endpoint, body, env.FAL_KEY, (sd) => {
@@ -447,7 +486,7 @@ async function main() {
     const wfPath = process.env.COMFYUI_WORKFLOW
       ? path.resolve(process.env.COMFYUI_WORKFLOW)
       : path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')),
-                  'comfyui-workflows', 'ltx-video-i2v.json');
+                  'comfyui-workflows', path.basename(COMFYUI_WORKFLOW_DEFAULT));
     if (!existsSync(wfPath)) throw new Error(`workflow not found: ${wfPath}`);
     // Sanity-ping ComfyUI
     const ping = await fetch(`${comfyUrl}/system_stats`).catch(() => null);
