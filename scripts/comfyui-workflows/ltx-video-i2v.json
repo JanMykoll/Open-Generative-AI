@@ -1,0 +1,103 @@
+{
+  "_meta": {
+    "name": "LTX-Video 2B v0.9.8 distilled fp8 — Image-to-Video (5s @ 24fps)",
+    "model": "ltxv-2b-0.9.8-distilled-fp8.safetensors",
+    "comfyui_version_min": "0.18.1",
+    "expects_native_nodes": true,
+    "params": {
+      "{{IMAGE}}":    "uploaded image filename (ComfyUI input/ dir)",
+      "{{PROMPT}}":   "positive prompt — describe the desired scene",
+      "{{NEGATIVE}}": "negative prompt (defaulted in script if blank)",
+      "{{WIDTH}}":    "frame width (multiple of 32)",
+      "{{HEIGHT}}":   "frame height (multiple of 32)",
+      "{{LENGTH}}":   "frame count (8n+1, e.g. 121 ≈ 5s @ 24fps)",
+      "{{FPS}}":      "output frames-per-second",
+      "{{SEED}}":     "noise seed (int)",
+      "{{PREFIX}}":   "SaveVideo filename prefix"
+    }
+  },
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "ltxv-2b-0.9.8-distilled-fp8.safetensors" }
+  },
+  "2": {
+    "class_type": "ModelSamplingLTXV",
+    "inputs": { "model": ["1", 0], "max_shift": 2.05, "base_shift": 0.95 }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "{{PROMPT}}", "clip": ["1", 1] }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "{{NEGATIVE}}", "clip": ["1", 1] }
+  },
+  "5": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "{{IMAGE}}" }
+  },
+  "6": {
+    "class_type": "LTXVImgToVideo",
+    "inputs": {
+      "positive": ["3", 0],
+      "negative": ["4", 0],
+      "vae": ["1", 2],
+      "image": ["5", 0],
+      "width": {{WIDTH}},
+      "height": {{HEIGHT}},
+      "length": {{LENGTH}},
+      "batch_size": 1,
+      "strength": 1.0
+    }
+  },
+  "7": {
+    "class_type": "LTXVConditioning",
+    "inputs": { "positive": ["6", 0], "negative": ["6", 1], "frame_rate": {{FPS}} }
+  },
+  "8": {
+    "class_type": "LTXVScheduler",
+    "inputs": {
+      "steps": 30,
+      "max_shift": 2.05,
+      "base_shift": 0.95,
+      "stretch": true,
+      "terminal": 0.1,
+      "latent": ["6", 2]
+    }
+  },
+  "9": {
+    "class_type": "KSamplerSelect",
+    "inputs": { "sampler_name": "euler" }
+  },
+  "10": {
+    "class_type": "SamplerCustom",
+    "inputs": {
+      "model": ["2", 0],
+      "add_noise": true,
+      "noise_seed": {{SEED}},
+      "cfg": 3.0,
+      "positive": ["7", 0],
+      "negative": ["7", 1],
+      "sampler": ["9", 0],
+      "sigmas": ["8", 0],
+      "latent_image": ["6", 2]
+    }
+  },
+  "11": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["10", 0], "vae": ["1", 2] }
+  },
+  "12": {
+    "class_type": "CreateVideo",
+    "inputs": { "images": ["11", 0], "fps": {{FPS}} }
+  },
+  "13": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": ["12", 0],
+      "filename_prefix": "{{PREFIX}}",
+      "format": "mp4",
+      "codec": "h264"
+    }
+  }
+}

@@ -40,3 +40,6 @@ out/
 .env.*
 !.env.example
 .vercel
+
+# Local recreate-video runs (downloads + generated clips)
+.recreate/
