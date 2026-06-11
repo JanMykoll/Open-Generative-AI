@@ -118,8 +118,13 @@ export function ImageStudio() {
             uploadedImageUrls = urls || [url];
             if (!imageMode) {
                 imageMode = true;
-                selectedModel = i2iModels[0].id;
-                selectedModelName = i2iModels[0].name;
+                // Default to a prompt-capable editor (identity/reference workflows), not a
+                // no-prompt tool like the upscaler — uploading a ref must keep the prompt box.
+                const defaultI2I = i2iModels.find(m => m.id === 'nano-banana-pro-edit')
+                    || i2iModels.find(m => m.hasPrompt)
+                    || i2iModels[0];
+                selectedModel = defaultI2I.id;
+                selectedModelName = defaultI2I.name;
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
